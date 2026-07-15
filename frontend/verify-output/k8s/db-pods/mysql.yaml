@@ -1,0 +1,94 @@
+# MySQL 8.0 for in-cluster verification.
+# Data is on emptyDir — wiped on Pod restart.
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: mysql-init
+  namespace: scalar-re
+data:
+  init.sql: |
+    CREATE USER IF NOT EXISTS 'scalaradmin'@'%' IDENTIFIED BY 'scalaradmin';
+    GRANT CREATE, DROP, ALTER, INDEX, SELECT, INSERT, UPDATE, DELETE
+      ON *.* TO 'scalaradmin'@'%';
+    FLUSH PRIVILEGES;
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: mysql
+  namespace: scalar-re
+  labels:
+    app: mysql
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app: mysql
+  template:
+    metadata:
+      labels:
+        app: mysql
+    spec:
+      containers:
+      - name: mysql
+        image: mysql:8.0
+        # max-connect-errors defaults to 100; under a repeating-retry
+        # workload (e.g. benchmark scripts restarting Producer) MySQL
+        # will block the client IP and require a manual flush-hosts.
+        # Raising the ceiling removes that failure mode.
+        args: ["--max-connections=1000", "--max-connect-errors=100000"]
+        ports:
+        - name: mysql
+          containerPort: 3306
+        env:
+        - name: MYSQL_ROOT_PASSWORD
+          value: "rootpassword"
+        readinessProbe:
+          tcpSocket:
+            port: mysql
+          initialDelaySeconds: 20
+          periodSeconds: 5
+          timeoutSeconds: 3
+        livenessProbe:
+          tcpSocket:
+            port: mysql
+          initialDelaySeconds: 60
+          periodSeconds: 15
+          timeoutSeconds: 5
+        volumeMounts:
+        - name: data
+          mountPath: /var/lib/mysql
+        - name: init
+          mountPath: /docker-entrypoint-initdb.d
+        resources:
+          requests:
+            cpu: 200m
+            memory: 512Mi
+          limits:
+            cpu: "1"
+            memory: 1Gi
+      volumes:
+      - name: data
+        emptyDir: {}
+      - name: init
+        configMap:
+          name: mysql-init
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: mysql
+  namespace: scalar-re
+  labels:
+    app: mysql
+spec:
+  type: LoadBalancer
+  selector:
+    app: mysql
+  ports:
+  - name: mysql
+    port: 3306
+    targetPort: mysql

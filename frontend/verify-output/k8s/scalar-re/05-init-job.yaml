@@ -1,0 +1,49 @@
+# ScalarRE schema initialization Job.
+#
+# Apply this (and wait for completion) BEFORE applying 30-deployment.yaml.
+#
+#   kubectl apply -f scalar-re/05-init-job.yaml
+#   kubectl wait --for=condition=complete job/scalar-re-init -n scalar-re --timeout=120s
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: scalar-re-init
+  namespace: scalar-re
+  labels:
+    app: scalar-re
+    component: init
+spec:
+  backoffLimit: 6
+  ttlSecondsAfterFinished: 600
+  template:
+    metadata:
+      labels:
+        app: scalar-re
+        component: init
+    spec:
+      restartPolicy: OnFailure
+      imagePullSecrets:
+      - name: ghcr-pull
+      containers:
+      - name: init
+        image: ghcr.io/yu2scalar/scalar-re-init:latest
+        imagePullPolicy: Always
+        envFrom:
+        - secretRef:
+            name: scalar-re-credentials
+        volumeMounts:
+        - name: config
+          mountPath: /app/scalar-re-config.yml
+          subPath: scalar-re-config.yml
+          readOnly: true
+        resources:
+          requests:
+            cpu: 100m
+            memory: 256Mi
+          limits:
+            cpu: "1"
+            memory: 1Gi
+      volumes:
+      - name: config
+        configMap:
+          name: scalar-re-config

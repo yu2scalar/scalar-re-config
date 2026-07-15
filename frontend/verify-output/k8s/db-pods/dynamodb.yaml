@@ -1,0 +1,68 @@
+# DynamoDB Local (in-memory) for verification.
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: dynamodb
+  namespace: scalar-re
+  labels:
+    app: dynamodb
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app: dynamodb
+  template:
+    metadata:
+      labels:
+        app: dynamodb
+    spec:
+      containers:
+      - name: dynamodb
+        image: amazon/dynamodb-local:latest
+        imagePullPolicy: IfNotPresent
+        args: ["-jar", "DynamoDBLocal.jar", "-sharedDb", "-inMemory"]
+        ports:
+        - name: dynamodb
+          containerPort: 8000
+        # Lenient probes: dynamodb-local 3.x cold-starts slowly under CPU contention;
+        # an aggressive liveness (timeoutSeconds default 1) crash-loops it.
+        readinessProbe:
+          tcpSocket:
+            port: dynamodb
+          initialDelaySeconds: 10
+          periodSeconds: 5
+          timeoutSeconds: 5
+          failureThreshold: 6
+        livenessProbe:
+          tcpSocket:
+            port: dynamodb
+          initialDelaySeconds: 60
+          periodSeconds: 20
+          timeoutSeconds: 5
+          failureThreshold: 6
+        resources:
+          requests:
+            cpu: 100m
+            memory: 256Mi
+          limits:
+            cpu: 500m
+            memory: 1Gi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: dynamodb
+  namespace: scalar-re
+  labels:
+    app: dynamodb
+spec:
+  type: LoadBalancer
+  selector:
+    app: dynamodb
+  ports:
+  - name: dynamodb
+    port: 8000
+    targetPort: dynamodb

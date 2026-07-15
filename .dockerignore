@@ -1,0 +1,19 @@
+# The Docker build context only needs the jar in build/libs (host-build + COPY).
+# Exclude heavy/unneeded entries to keep the context small.
+.git
+.gradle
+frontend/node_modules
+frontend/dist
+verify
+src
+gradle
+gradlew
+gradlew.bat
+*.md
+samples
+deploy
+scalar-re-config.yml.local
+
+# Exclude build/ (lots of intermediate artifacts) while keeping only build/libs, the COPY target
+build/*
+!build/libs

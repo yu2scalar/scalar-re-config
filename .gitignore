@@ -1,0 +1,15 @@
+# Gradle / Spring Boot
+.gradle/
+build/
+
+# Frontend (vite/React)
+frontend/node_modules/
+frontend/dist/
+
+# IDE / OS
+.idea/
+*.iml
+.DS_Store
+
+# local config samples (prevents leaking locally added secrets)
+scalar-re-config.yml.local

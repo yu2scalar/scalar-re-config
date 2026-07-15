@@ -1,0 +1,70 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: scalar-re
+  namespace: scalar-re
+  labels:
+    app: scalar-re
+spec:
+  replicas: 3
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 0
+      maxSurge: 1
+  selector:
+    matchLabels:
+      app: scalar-re
+  template:
+    metadata:
+      labels:
+        app: scalar-re
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "8080"
+        prometheus.io/path: "/actuator/prometheus"
+    spec:
+      imagePullSecrets:
+      - name: ghcr-pull
+      containers:
+      - name: scalar-re
+        image: ghcr.io/yu2scalar/scalar-re:latest
+        imagePullPolicy: Always
+        ports:
+        - name: http
+          containerPort: 8080
+        envFrom:
+        - secretRef:
+            name: scalar-re-credentials
+        volumeMounts:
+        - name: config
+          mountPath: /app/scalar-re-config.yml
+          subPath: scalar-re-config.yml
+          readOnly: true
+        livenessProbe:
+          httpGet:
+            path: /actuator/health
+            port: http
+          initialDelaySeconds: 60
+          periodSeconds: 15
+          timeoutSeconds: 5
+          failureThreshold: 4
+        readinessProbe:
+          httpGet:
+            path: /actuator/health
+            port: http
+          initialDelaySeconds: 15
+          periodSeconds: 5
+          timeoutSeconds: 3
+          failureThreshold: 3
+        resources:
+          requests:
+            cpu: 250m
+            memory: 512Mi
+          limits:
+            cpu: "2"
+            memory: 2Gi
+      volumes:
+      - name: config
+        configMap:
+          name: scalar-re-config

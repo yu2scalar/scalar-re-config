@@ -1,0 +1,79 @@
+plugins {
+    id 'java'
+    id 'org.springframework.boot' version '3.5.14'
+    id 'io.spring.dependency-management' version '1.1.7'
+}
+
+group = 'com.scalar.re'
+version = '0.9.0'
+description = 'ScalarRE Config Tool (Spring Boot)'
+
+java {
+    toolchain {
+        languageVersion = JavaLanguageVersion.of(17)
+    }
+}
+
+repositories {
+    mavenCentral()
+}
+
+dependencies {
+    implementation 'org.springframework.boot:spring-boot-starter-web'
+    // Admin auth: HTTP Basic is enabled only when ADMIN_PASSWORD is set (SecurityConfig).
+    //   When unset, everything is permitAll = no auth. Basic is meant to be used together with TLS.
+    implementation 'org.springframework.boot:spring-boot-starter-security'
+    // YAML save/load (port of the Go generator's SaveYAML / LoadYAML / ImportLegacy)
+    implementation 'com.fasterxml.jackson.dataformat:jackson-dataformat-yaml'
+    // ScalarDB SDK — /api/db/verify calls DistributedTransactionAdmin directly;
+    //   also used by /api/db/init.
+    implementation 'com.scalar-labs:scalardb:3.18.0'
+
+    testImplementation 'org.springframework.boot:spring-boot-starter-test'
+}
+
+tasks.named('test') {
+    useJUnitPlatform()
+}
+
+// Disable the plain (non-boot) jar so build/libs contains exactly one
+// scalar-re-config-*.jar — the Dockerfile COPY glob relies on this.
+tasks.named('jar') {
+    enabled = false
+}
+
+// ---------------------------------------------------------------------------
+// Frontend (vite/React) build integration
+//   The existing React frontend is reused unmodified; the vite build output
+//   (frontend/dist) is bundled into the fat jar as src/main/resources/static.
+// ---------------------------------------------------------------------------
+def frontendDir = file("$projectDir/frontend")
+def frontendDist = file("$frontendDir/dist")
+
+tasks.register('npmInstall', Exec) {
+    description = 'Install frontend dependencies (npm ci)'
+    workingDir frontendDir
+    inputs.file("$frontendDir/package.json")
+    inputs.file("$frontendDir/package-lock.json")
+    outputs.dir("$frontendDir/node_modules")
+    commandLine 'npm', 'ci'
+}
+
+tasks.register('npmBuild', Exec) {
+    description = 'Generate frontend/dist via vite build'
+    dependsOn 'npmInstall'
+    workingDir frontendDir
+    inputs.dir("$frontendDir/src")
+    inputs.file("$frontendDir/index.html")
+    inputs.file("$frontendDir/package.json")
+    outputs.dir(frontendDist)
+    commandLine 'npm', 'run', 'build'
+}
+
+// Bundle frontend/dist into static/ on the classpath
+processResources {
+    dependsOn 'npmBuild'
+    from(frontendDist) {
+        into 'static'
+    }
+}

@@ -1,0 +1,53 @@
+# DESTRUCTIVE: drops and recreates all ScalarRE tables.
+#
+#   kubectl scale deployment/scalar-re --replicas=0 -n scalar-re
+#   kubectl delete job/scalar-re-init -n scalar-re
+#   kubectl apply -f scalar-re/05-init-job-recreate.yaml
+#   kubectl wait --for=condition=complete job/scalar-re-init-recreate -n scalar-re
+#   kubectl scale deployment/scalar-re --replicas=3 -n scalar-re
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: scalar-re-init-recreate
+  namespace: scalar-re
+  labels:
+    app: scalar-re
+    component: init
+    mode: recreate
+spec:
+  backoffLimit: 2
+  ttlSecondsAfterFinished: 600
+  template:
+    metadata:
+      labels:
+        app: scalar-re
+        component: init
+        mode: recreate
+    spec:
+      restartPolicy: OnFailure
+      imagePullSecrets:
+      - name: ghcr-pull
+      containers:
+      - name: init
+        image: ghcr.io/yu2scalar/scalar-re-init:latest
+        imagePullPolicy: Always
+        args: ["--recreate-schema"]
+        envFrom:
+        - secretRef:
+            name: scalar-re-credentials
+        volumeMounts:
+        - name: config
+          mountPath: /app/scalar-re-config.yml
+          subPath: scalar-re-config.yml
+          readOnly: true
+        resources:
+          requests:
+            cpu: 100m
+            memory: 256Mi
+          limits:
+            cpu: "1"
+            memory: 1Gi
+      volumes:
+      - name: config
+        configMap:
+          name: scalar-re-config

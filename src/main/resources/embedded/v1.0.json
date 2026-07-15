@@ -1,0 +1,201 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "ScalarRE Configuration",
+  "version": "1.0",
+  "compatible-re-versions": ["1.0.x"],
+  "type": "object",
+  "required": ["schema-version", "storages", "namespaces"],
+  "properties": {
+    "schema-version": {
+      "type": "string",
+      "const": "1.0"
+    },
+    "global": {
+      "type": "object",
+      "properties": {
+        "management-namespace": {
+          "type": "string",
+          "default": "scalarre"
+        },
+        "management-storage": {
+          "type": "string"
+        },
+        "auto-create-tables": {
+          "type": "boolean",
+          "default": true
+        },
+        "auth": {
+          "type": "object",
+          "properties": {
+            "api-key": { "type": "string" }
+          }
+        },
+        "retry": {
+          "type": "object",
+          "properties": {
+            "max-attempts": { "type": "integer", "default": 3, "minimum": 1 },
+            "initial-delay-ms": { "type": "integer", "default": 100, "minimum": 1 },
+            "max-delay-ms": { "type": "integer", "default": 5000, "minimum": 1 },
+            "multiplier": { "type": "number", "default": 2.0, "minimum": 1.0 }
+          }
+        },
+        "internal-queue": {
+          "type": "object",
+          "properties": {
+            "worker-threads": { "type": "integer", "default": 10, "minimum": 1 },
+            "queue-capacity": { "type": "integer", "default": 10000, "minimum": 1 }
+          }
+        },
+        "cluster": {
+          "type": "object",
+          "properties": {
+            "cluster-id": { "type": "string", "default": "default" },
+            "heartbeat-interval-ms": { "type": "integer", "default": 30000, "minimum": 1000 },
+            "heartbeat-expiry-ms": { "type": "integer", "default": 60000, "minimum": 1000 },
+            "cleanup-retention-ms": { "type": "integer", "default": 86400000, "minimum": 1000 }
+          }
+        },
+        "license": {
+          "type": "object",
+          "properties": {
+            "max-nodes": { "type": "integer", "minimum": 1 },
+            "expires-at": { "type": "string", "pattern": "^\\d{4}-\\d{2}-\\d{2}$" }
+          }
+        },
+        "server": {
+          "type": "object",
+          "properties": {
+            "tomcat-max-threads": { "type": "integer", "default": 200, "minimum": 1 }
+          }
+        },
+        "polling": {
+          "type": "object",
+          "properties": {
+            "dedup-enabled": { "type": "boolean", "default": true },
+            "dedup-peer-timeout-ms": { "type": "integer", "default": 3000, "minimum": 100 },
+            "backoff-enabled": { "type": "boolean", "default": true },
+            "backoff-max-interval-ms": { "type": "integer", "default": 30000, "minimum": 1000 }
+          }
+        },
+        "replay": {
+          "type": "object",
+          "properties": {
+            "enabled": { "type": "boolean", "default": true },
+            "worker-threads": { "type": "integer", "default": 2, "minimum": 1 },
+            "queue-capacity": { "type": "integer", "default": 100000, "minimum": 1 }
+          }
+        },
+        "completed-ttl-seconds": { "type": "integer", "default": 604800, "minimum": 0 },
+        "recovery": {
+          "type": "object",
+          "properties": {
+            "prepared-age-threshold-ms": { "type": "integer", "default": 15000, "minimum": 0 },
+            "inbox-recovery-enabled": { "type": "boolean", "default": true },
+            "inbox-recovery-interval-ms": { "type": "integer", "default": 15000, "minimum": 1000 },
+            "inbox-recovery-batch-size": { "type": "integer", "default": 100, "minimum": 1 },
+            "relay-ack-timeout-enabled": { "type": "boolean", "default": true },
+            "relay-ack-timeout-interval-ms": { "type": "integer", "default": 60000, "minimum": 1000 },
+            "relay-ack-timeout-batch-size": { "type": "integer", "default": 100, "minimum": 1 }
+          }
+        }
+      }
+    },
+    "storages": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "object",
+        "required": ["type", "contact-points", "username", "password"],
+        "properties": {
+          "type": {
+            "type": "string",
+            "enum": ["jdbc", "dynamo", "cosmos"]
+          },
+          "contact-points": { "type": "string" },
+          "username": { "type": "string" },
+          "password": { "type": "string" },
+          "options": {
+            "type": "object",
+            "properties": {
+              "connection-pool-max-total": { "type": "integer", "minimum": 1 },
+              "metadata-cache-expiration-secs": { "type": "integer", "minimum": 0 },
+              "endpoint-override": { "type": "string" },
+              "namespace-prefix": { "type": "string" }
+            }
+          }
+        }
+      }
+    },
+    "scalardb": {
+      "type": "object",
+      "properties": {
+        "transaction-manager": {
+          "type": "string",
+          "enum": ["consensus-commit"],
+          "default": "consensus-commit"
+        },
+        "isolation-level": {
+          "type": "string",
+          "enum": ["READ_COMMITTED", "SERIALIZABLE"],
+          "default": "READ_COMMITTED"
+        },
+        "default-storage": { "type": "string" }
+      }
+    },
+    "namespaces": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "object",
+        "required": ["storage"],
+        "properties": {
+          "storage": { "type": "string" },
+          "destination": {
+            "type": "object",
+            "properties": {
+              "worker-threads": { "type": "integer", "default": 30, "minimum": 1 },
+              "queue-capacity": { "type": "integer", "default": 100000, "minimum": 1 },
+              "throughput-tps": { "type": "integer", "default": 2000, "minimum": 1 }
+            }
+          },
+          "polling": {
+            "type": "object",
+            "properties": {
+              "outbox-poll-interval-ms": { "type": "integer", "default": 2000, "minimum": 100 },
+              "outbox-poll-delay-ms": { "type": "integer", "default": 5000, "minimum": 0 },
+              "outbox-batch-size": { "type": "integer", "default": 100, "minimum": 1 }
+            }
+          },
+          "completed-enabled": { "type": "boolean", "default": true },
+          "hmac": {
+            "type": "object",
+            "properties": {
+              "key": { "type": "string" },
+              "key-previous": { "type": "string" },
+              "key-previous-expires-at": { "type": "integer", "default": 0 }
+            }
+          },
+          "event-types": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "object",
+              "properties": {
+                "enabled": { "type": "boolean", "default": true },
+                "delivery-type": {
+                  "type": "string",
+                  "enum": ["atomic", "partial", "relay", "pull", "qpull", "spull", "ordered_atomic"],
+                  "default": "relay"
+                },
+                "destination": { "type": "string" },
+                "partition-count": {
+                  "type": "integer",
+                  "default": 1,
+                  "minimum": 1,
+                  "maximum": 10000
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

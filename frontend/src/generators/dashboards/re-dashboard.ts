@@ -1,0 +1,805 @@
+/*
+ * Copyright 2026 Scalar Inc.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+// Grafana v1 classic JSON dashboard for ScalarRE.
+//
+// Direct "Export for sharing externally" snapshot from Grafana 10.4.2,
+// with two mechanical adjustments for file-based provisioning:
+//   1. Datasource placeholders ${DS_PROMETHEUS} / ${DS_LOKI} are replaced
+//      with the uids we register in grafana-provisioning/datasources.yml
+//      (prometheus / loki). The provisioner does not interpolate variables
+//      declared in __inputs.
+//   2. __inputs / __requires / __elements are dropped — only meaningful
+//      when importing through the UI.
+//
+// Layout (10 metric panels, 6 log panels):
+//   y=0   1:xfer-rate        | 8:tomcat-conn
+//   y=10  7:active-workers   | 9:tomcat-req-rate
+//   y=20  4:queue-size       | 3:xfer-latency
+//   y=30  5:polled-records   | 10:cpu
+//   y=40  6:xfer-total+byDst | 11:rollback-by-eventtype
+//   y=48  14:WARN|ERROR      | 12:Exception          (logs)
+//   y=56  13:Transfer error  | 15:Transfer conflict  (logs)
+//   y=64  16:Moved to DLQ    | 17:Poison message     (logs)
+//
+// To refresh: edit in Grafana UI -> Share -> Export for sharing
+// externally -> save JSON -> overwrite this file, then redo the two
+// substitutions above.
+
+export const reDashboard = {
+  annotations: {
+    list: [
+      {
+        builtIn: 1,
+        datasource: { type: 'grafana', uid: '-- Grafana --' },
+        enable: true,
+        hide: true,
+        iconColor: 'rgba(0, 211, 255, 1)',
+        name: 'Annotations & Alerts',
+        type: 'dashboard',
+      },
+    ],
+  },
+  editable: true,
+  fiscalYearStartMonth: 0,
+  graphTooltip: 0,
+  id: null,
+  links: [],
+  liveNow: false,
+  panels: [
+    {
+      datasource: { type: 'prometheus', uid: 'prometheus' },
+      fieldConfig: {
+        defaults: {
+          color: { mode: 'palette-classic' },
+          custom: {
+            axisBorderShow: false,
+            axisCenteredZero: false,
+            axisColorMode: 'text',
+            axisLabel: '',
+            axisPlacement: 'auto',
+            barAlignment: 0,
+            drawStyle: 'line',
+            fillOpacity: 0,
+            gradientMode: 'none',
+            hideFrom: { legend: false, tooltip: false, viz: false },
+            insertNulls: false,
+            lineInterpolation: 'linear',
+            lineWidth: 1,
+            pointSize: 5,
+            scaleDistribution: { type: 'linear' },
+            showPoints: 'auto',
+            spanNulls: false,
+            stacking: { group: 'A', mode: 'none' },
+            thresholdsStyle: { mode: 'off' },
+          },
+          mappings: [],
+          thresholds: {
+            mode: 'absolute',
+            steps: [
+              { color: 'green', value: null },
+              { color: 'red', value: 80 },
+            ],
+          },
+        },
+        overrides: [],
+      },
+      gridPos: { h: 10, w: 12, x: 0, y: 0 },
+      id: 1,
+      options: {
+        legend: { calcs: [], displayMode: 'list', placement: 'bottom', showLegend: true },
+        tooltip: { mode: 'single', sort: 'none' },
+      },
+      targets: [
+        {
+          datasource: { type: 'prometheus', uid: 'prometheus' },
+          editorMode: 'code',
+          expr: 'rate(scalar_re_messages_transferred_total[1m])',
+          legendFormat: '__auto',
+          range: true,
+          refId: 'A',
+        },
+      ],
+      title: 'scalar_re_messages_transferred_total',
+      type: 'timeseries',
+    },
+    {
+      datasource: { type: 'prometheus', uid: 'prometheus' },
+      fieldConfig: {
+        defaults: {
+          color: { mode: 'palette-classic' },
+          custom: {
+            axisBorderShow: false,
+            axisCenteredZero: false,
+            axisColorMode: 'text',
+            axisLabel: '',
+            axisPlacement: 'auto',
+            barAlignment: 0,
+            drawStyle: 'line',
+            fillOpacity: 0,
+            gradientMode: 'none',
+            hideFrom: { legend: false, tooltip: false, viz: false },
+            insertNulls: false,
+            lineInterpolation: 'linear',
+            lineWidth: 1,
+            pointSize: 5,
+            scaleDistribution: { type: 'linear' },
+            showPoints: 'auto',
+            spanNulls: false,
+            stacking: { group: 'A', mode: 'none' },
+            thresholdsStyle: { mode: 'off' },
+          },
+          mappings: [],
+          thresholds: {
+            mode: 'absolute',
+            steps: [
+              { color: 'green', value: null },
+              { color: 'red', value: 80 },
+            ],
+          },
+        },
+        overrides: [],
+      },
+      gridPos: { h: 10, w: 12, x: 12, y: 0 },
+      id: 8,
+      options: {
+        legend: { calcs: [], displayMode: 'list', placement: 'bottom', showLegend: true },
+        tooltip: { mode: 'single', sort: 'none' },
+      },
+      targets: [
+        {
+          datasource: { type: 'prometheus', uid: 'prometheus' },
+          editorMode: 'code',
+          expr: 'tomcat_connections_current_connections',
+          legendFormat: '__auto',
+          range: true,
+          refId: 'A',
+        },
+      ],
+      title: 'tomcat_connections_current_connections',
+      type: 'timeseries',
+    },
+    {
+      datasource: { type: 'prometheus', uid: 'prometheus' },
+      fieldConfig: {
+        defaults: {
+          color: { mode: 'palette-classic' },
+          custom: {
+            axisBorderShow: false,
+            axisCenteredZero: false,
+            axisColorMode: 'text',
+            axisLabel: '',
+            axisPlacement: 'auto',
+            barAlignment: 0,
+            drawStyle: 'line',
+            fillOpacity: 0,
+            gradientMode: 'none',
+            hideFrom: { legend: false, tooltip: false, viz: false },
+            insertNulls: false,
+            lineInterpolation: 'linear',
+            lineWidth: 1,
+            pointSize: 5,
+            scaleDistribution: { type: 'linear' },
+            showPoints: 'auto',
+            spanNulls: false,
+            stacking: { group: 'A', mode: 'none' },
+            thresholdsStyle: { mode: 'off' },
+          },
+          mappings: [],
+          thresholds: {
+            mode: 'absolute',
+            steps: [
+              { color: 'green', value: null },
+              { color: 'red', value: 80 },
+            ],
+          },
+        },
+        overrides: [],
+      },
+      gridPos: { h: 10, w: 12, x: 0, y: 10 },
+      id: 7,
+      options: {
+        legend: { calcs: [], displayMode: 'list', placement: 'bottom', showLegend: true },
+        tooltip: { mode: 'single', sort: 'none' },
+      },
+      targets: [
+        {
+          datasource: { type: 'prometheus', uid: 'prometheus' },
+          editorMode: 'code',
+          expr: 'scalar_re_destination_active_workers',
+          legendFormat: '__auto',
+          range: true,
+          refId: 'A',
+        },
+      ],
+      title: 'scalar_re_destination_active_workers',
+      type: 'timeseries',
+    },
+    {
+      datasource: { type: 'prometheus', uid: 'prometheus' },
+      fieldConfig: {
+        defaults: {
+          color: { mode: 'palette-classic' },
+          custom: {
+            axisBorderShow: false,
+            axisCenteredZero: false,
+            axisColorMode: 'text',
+            axisLabel: '',
+            axisPlacement: 'auto',
+            barAlignment: 0,
+            drawStyle: 'line',
+            fillOpacity: 0,
+            gradientMode: 'none',
+            hideFrom: { legend: false, tooltip: false, viz: false },
+            insertNulls: false,
+            lineInterpolation: 'linear',
+            lineWidth: 1,
+            pointSize: 5,
+            scaleDistribution: { type: 'linear' },
+            showPoints: 'auto',
+            spanNulls: false,
+            stacking: { group: 'A', mode: 'none' },
+            thresholdsStyle: { mode: 'off' },
+          },
+          mappings: [],
+          thresholds: {
+            mode: 'absolute',
+            steps: [
+              { color: 'green', value: null },
+              { color: 'red', value: 80 },
+            ],
+          },
+        },
+        overrides: [],
+      },
+      gridPos: { h: 10, w: 12, x: 12, y: 10 },
+      id: 9,
+      options: {
+        legend: { calcs: [], displayMode: 'list', placement: 'bottom', showLegend: true },
+        tooltip: { mode: 'single', sort: 'none' },
+      },
+      targets: [
+        {
+          datasource: { type: 'prometheus', uid: 'prometheus' },
+          editorMode: 'code',
+          expr: 'rate(tomcat_global_request_seconds_count[1m])',
+          legendFormat: '__auto',
+          range: true,
+          refId: 'A',
+        },
+      ],
+      title: 'rate(tomcat_global_request_seconds_count[1m])',
+      type: 'timeseries',
+    },
+    {
+      datasource: { type: 'prometheus', uid: 'prometheus' },
+      fieldConfig: {
+        defaults: {
+          color: { mode: 'palette-classic' },
+          custom: {
+            axisBorderShow: false,
+            axisCenteredZero: false,
+            axisColorMode: 'text',
+            axisLabel: '',
+            axisPlacement: 'auto',
+            barAlignment: 0,
+            drawStyle: 'line',
+            fillOpacity: 0,
+            gradientMode: 'none',
+            hideFrom: { legend: false, tooltip: false, viz: false },
+            insertNulls: false,
+            lineInterpolation: 'linear',
+            lineWidth: 1,
+            pointSize: 5,
+            scaleDistribution: { type: 'linear' },
+            showPoints: 'auto',
+            spanNulls: false,
+            stacking: { group: 'A', mode: 'none' },
+            thresholdsStyle: { mode: 'off' },
+          },
+          mappings: [],
+          thresholds: {
+            mode: 'absolute',
+            steps: [
+              { color: 'green', value: null },
+              { color: 'red', value: 80 },
+            ],
+          },
+        },
+        overrides: [],
+      },
+      gridPos: { h: 10, w: 12, x: 0, y: 20 },
+      id: 4,
+      options: {
+        legend: { calcs: [], displayMode: 'list', placement: 'bottom', showLegend: true },
+        tooltip: { mode: 'single', sort: 'none' },
+      },
+      targets: [
+        {
+          datasource: { type: 'prometheus', uid: 'prometheus' },
+          editorMode: 'code',
+          expr: 'scalar_re_destination_queue_size',
+          legendFormat: '__auto',
+          range: true,
+          refId: 'A',
+        },
+      ],
+      title: 'scalar_re_destination_queue_size',
+      type: 'timeseries',
+    },
+    {
+      datasource: { type: 'prometheus', uid: 'prometheus' },
+      fieldConfig: {
+        defaults: {
+          color: { mode: 'palette-classic' },
+          custom: {
+            axisBorderShow: false,
+            axisCenteredZero: false,
+            axisColorMode: 'text',
+            axisLabel: '',
+            axisPlacement: 'auto',
+            barAlignment: 0,
+            drawStyle: 'line',
+            fillOpacity: 0,
+            gradientMode: 'none',
+            hideFrom: { legend: false, tooltip: false, viz: false },
+            insertNulls: false,
+            lineInterpolation: 'linear',
+            lineWidth: 1,
+            pointSize: 5,
+            scaleDistribution: { type: 'linear' },
+            showPoints: 'auto',
+            spanNulls: false,
+            stacking: { group: 'A', mode: 'none' },
+            thresholdsStyle: { mode: 'off' },
+          },
+          mappings: [],
+          thresholds: {
+            mode: 'absolute',
+            steps: [
+              { color: 'green', value: null },
+              { color: 'red', value: 80 },
+            ],
+          },
+        },
+        overrides: [],
+      },
+      gridPos: { h: 10, w: 12, x: 12, y: 20 },
+      id: 3,
+      options: {
+        legend: { calcs: [], displayMode: 'list', placement: 'bottom', showLegend: true },
+        tooltip: { mode: 'single', sort: 'none' },
+      },
+      targets: [
+        {
+          datasource: { type: 'prometheus', uid: 'prometheus' },
+          editorMode: 'code',
+          expr: 'scalar_re_transfer_latency_seconds',
+          legendFormat: '__auto',
+          range: true,
+          refId: 'A',
+        },
+      ],
+      title: 'scalar_re_transfer_latency_seconds',
+      type: 'timeseries',
+    },
+    {
+      datasource: { type: 'prometheus', uid: 'prometheus' },
+      fieldConfig: {
+        defaults: {
+          color: { mode: 'palette-classic' },
+          custom: {
+            axisBorderShow: false,
+            axisCenteredZero: false,
+            axisColorMode: 'text',
+            axisLabel: '',
+            axisPlacement: 'auto',
+            barAlignment: 0,
+            drawStyle: 'line',
+            fillOpacity: 0,
+            gradientMode: 'none',
+            hideFrom: { legend: false, tooltip: false, viz: false },
+            insertNulls: false,
+            lineInterpolation: 'linear',
+            lineWidth: 1,
+            pointSize: 5,
+            scaleDistribution: { type: 'linear' },
+            showPoints: 'auto',
+            spanNulls: false,
+            stacking: { group: 'A', mode: 'none' },
+            thresholdsStyle: { mode: 'off' },
+          },
+          mappings: [],
+          thresholds: {
+            mode: 'absolute',
+            steps: [
+              { color: 'green', value: null },
+              { color: 'red', value: 80 },
+            ],
+          },
+        },
+        overrides: [],
+      },
+      gridPos: { h: 10, w: 12, x: 0, y: 30 },
+      id: 5,
+      options: {
+        legend: { calcs: [], displayMode: 'list', placement: 'bottom', showLegend: true },
+        tooltip: { mode: 'single', sort: 'none' },
+      },
+      targets: [
+        {
+          datasource: { type: 'prometheus', uid: 'prometheus' },
+          editorMode: 'code',
+          expr: 'scalar_re_polled_records_count',
+          legendFormat: '__auto',
+          range: true,
+          refId: 'A',
+        },
+      ],
+      title: 'scalar_re_polled_records_count',
+      type: 'timeseries',
+    },
+    {
+      datasource: { type: 'prometheus', uid: 'prometheus' },
+      fieldConfig: {
+        defaults: {
+          color: { mode: 'palette-classic' },
+          custom: {
+            axisBorderShow: false,
+            axisCenteredZero: false,
+            axisColorMode: 'text',
+            axisLabel: '',
+            axisPlacement: 'auto',
+            barAlignment: 0,
+            drawStyle: 'line',
+            fillOpacity: 0,
+            gradientMode: 'none',
+            hideFrom: { legend: false, tooltip: false, viz: false },
+            insertNulls: false,
+            lineInterpolation: 'linear',
+            lineWidth: 1,
+            pointSize: 5,
+            scaleDistribution: { type: 'linear' },
+            showPoints: 'auto',
+            spanNulls: false,
+            stacking: { group: 'A', mode: 'none' },
+            thresholdsStyle: { mode: 'off' },
+          },
+          mappings: [],
+          thresholds: {
+            mode: 'absolute',
+            steps: [
+              { color: 'green', value: null },
+              { color: 'red', value: 80 },
+            ],
+          },
+        },
+        overrides: [],
+      },
+      gridPos: { h: 10, w: 12, x: 12, y: 30 },
+      id: 10,
+      options: {
+        legend: { calcs: [], displayMode: 'list', placement: 'bottom', showLegend: true },
+        tooltip: { mode: 'single', sort: 'none' },
+      },
+      targets: [
+        {
+          datasource: { type: 'prometheus', uid: 'prometheus' },
+          editorMode: 'code',
+          expr: 'system_cpu_usage',
+          legendFormat: '__auto',
+          range: true,
+          refId: 'A',
+        },
+      ],
+      title: 'system_cpu_usage',
+      type: 'timeseries',
+    },
+    {
+      datasource: { type: 'prometheus', uid: 'prometheus' },
+      fieldConfig: {
+        defaults: {
+          color: { mode: 'palette-classic' },
+          custom: {
+            axisBorderShow: false,
+            axisCenteredZero: false,
+            axisColorMode: 'text',
+            axisLabel: '',
+            axisPlacement: 'auto',
+            barAlignment: 0,
+            drawStyle: 'line',
+            fillOpacity: 0,
+            gradientMode: 'none',
+            hideFrom: { legend: false, tooltip: false, viz: false },
+            insertNulls: false,
+            lineInterpolation: 'linear',
+            lineWidth: 1,
+            pointSize: 5,
+            scaleDistribution: { type: 'linear' },
+            showPoints: 'auto',
+            spanNulls: false,
+            stacking: { group: 'A', mode: 'none' },
+            thresholdsStyle: { mode: 'off' },
+          },
+          mappings: [],
+          thresholds: {
+            mode: 'absolute',
+            steps: [
+              { color: 'green', value: null },
+              { color: 'red', value: 80 },
+            ],
+          },
+        },
+        overrides: [],
+      },
+      gridPos: { h: 8, w: 12, x: 0, y: 40 },
+      id: 6,
+      options: {
+        legend: { calcs: [], displayMode: 'list', placement: 'bottom', showLegend: true },
+        tooltip: { mode: 'single', sort: 'none' },
+      },
+      targets: [
+        {
+          datasource: { type: 'prometheus', uid: 'prometheus' },
+          editorMode: 'code',
+          expr: 'sum(rate(scalar_re_messages_transferred_total[1m]))',
+          legendFormat: '__auto',
+          range: true,
+          refId: 'A',
+        },
+        {
+          datasource: { type: 'prometheus', uid: 'prometheus' },
+          editorMode: 'code',
+          expr: 'sum by (destination) (rate(scalar_re_messages_transferred_total[1m]))',
+          legendFormat: '__auto',
+          range: true,
+          refId: 'B',
+        },
+      ],
+      title: 'scalar_re_messages_transferred_total',
+      type: 'timeseries',
+    },
+    {
+      datasource: { type: 'prometheus', uid: 'prometheus' },
+      fieldConfig: {
+        defaults: {
+          color: { mode: 'palette-classic' },
+          custom: {
+            axisBorderShow: false,
+            axisCenteredZero: false,
+            axisColorMode: 'text',
+            axisLabel: '',
+            axisPlacement: 'auto',
+            barAlignment: 0,
+            drawStyle: 'line',
+            fillOpacity: 0,
+            gradientMode: 'none',
+            hideFrom: { legend: false, tooltip: false, viz: false },
+            insertNulls: false,
+            lineInterpolation: 'linear',
+            lineWidth: 1,
+            pointSize: 5,
+            scaleDistribution: { type: 'linear' },
+            showPoints: 'auto',
+            spanNulls: false,
+            stacking: { group: 'A', mode: 'none' },
+            thresholdsStyle: { mode: 'off' },
+          },
+          mappings: [],
+          thresholds: {
+            mode: 'absolute',
+            steps: [
+              { color: 'green', value: null },
+              { color: 'red', value: 80 },
+            ],
+          },
+        },
+        overrides: [],
+      },
+      gridPos: { h: 8, w: 12, x: 12, y: 40 },
+      id: 11,
+      options: {
+        legend: { calcs: [], displayMode: 'list', placement: 'bottom', showLegend: true },
+        tooltip: { mode: 'single', sort: 'none' },
+      },
+      targets: [
+        {
+          datasource: { type: 'prometheus', uid: 'prometheus' },
+          editorMode: 'code',
+          expr: 'sum by (event_type) (rate(scalar_re_tx_rollback_total[1m]))',
+          legendFormat: '__auto',
+          range: true,
+          refId: 'A',
+        },
+      ],
+      title: 'sum by (event_type) (rate(scalar_re_tx_rollback_total[1m]))',
+      type: 'timeseries',
+    },
+    {
+      datasource: { type: 'loki', uid: 'loki' },
+      gridPos: { h: 8, w: 12, x: 0, y: 48 },
+      id: 14,
+      options: {
+        dedupStrategy: 'none',
+        enableLogDetails: true,
+        prettifyLogMessage: false,
+        showCommonLabels: false,
+        showLabels: false,
+        showTime: false,
+        sortOrder: 'Descending',
+        wrapLogMessage: false,
+      },
+      pluginVersion: '10.4.2',
+      targets: [
+        {
+          datasource: { type: 'loki', uid: 'loki' },
+          editorMode: 'code',
+          expr: '{compose_service=~"re-.*|scalar-re"} |~ " (WARN|ERROR) "      ',
+          queryType: 'range',
+          refId: 'A',
+        },
+      ],
+      title: 'WARN|ERROR',
+      type: 'logs',
+    },
+    {
+      datasource: { type: 'loki', uid: 'loki' },
+      gridPos: { h: 8, w: 12, x: 12, y: 48 },
+      id: 12,
+      options: {
+        dedupStrategy: 'none',
+        enableLogDetails: true,
+        prettifyLogMessage: false,
+        showCommonLabels: false,
+        showLabels: false,
+        showTime: false,
+        sortOrder: 'Descending',
+        wrapLogMessage: false,
+      },
+      pluginVersion: '10.4.2',
+      targets: [
+        {
+          datasource: { type: 'loki', uid: 'loki' },
+          editorMode: 'code',
+          expr: '{compose_service=~"re-.*|scalar-re"} |~ "Exception|Caused by"    ',
+          queryType: 'range',
+          refId: 'A',
+        },
+      ],
+      title: 'Exception',
+      type: 'logs',
+    },
+    {
+      datasource: { type: 'loki', uid: 'loki' },
+      gridPos: { h: 8, w: 12, x: 0, y: 56 },
+      id: 13,
+      options: {
+        dedupStrategy: 'none',
+        enableLogDetails: true,
+        prettifyLogMessage: false,
+        showCommonLabels: false,
+        showLabels: false,
+        showTime: false,
+        sortOrder: 'Descending',
+        wrapLogMessage: false,
+      },
+      pluginVersion: '10.4.2',
+      targets: [
+        {
+          datasource: { type: 'loki', uid: 'loki' },
+          editorMode: 'code',
+          expr: '{compose_service=~"re-.*|scalar-re"} |= "Transfer error"  ',
+          queryType: 'range',
+          refId: 'A',
+        },
+      ],
+      title: 'Transfer error',
+      type: 'logs',
+    },
+    {
+      datasource: { type: 'loki', uid: 'loki' },
+      gridPos: { h: 8, w: 12, x: 12, y: 56 },
+      id: 15,
+      options: {
+        dedupStrategy: 'none',
+        enableLogDetails: true,
+        prettifyLogMessage: false,
+        showCommonLabels: false,
+        showLabels: false,
+        showTime: false,
+        sortOrder: 'Descending',
+        wrapLogMessage: false,
+      },
+      pluginVersion: '10.4.2',
+      targets: [
+        {
+          datasource: { type: 'loki', uid: 'loki' },
+          editorMode: 'code',
+          expr: '{compose_service=~"re-.*|scalar-re"} |= "Transfer conflict"   ',
+          queryType: 'range',
+          refId: 'A',
+        },
+      ],
+      title: 'Transfer conflict',
+      type: 'logs',
+    },
+    {
+      datasource: { type: 'loki', uid: 'loki' },
+      gridPos: { h: 8, w: 12, x: 0, y: 64 },
+      id: 16,
+      options: {
+        dedupStrategy: 'none',
+        enableLogDetails: true,
+        prettifyLogMessage: false,
+        showCommonLabels: false,
+        showLabels: false,
+        showTime: false,
+        sortOrder: 'Descending',
+        wrapLogMessage: false,
+      },
+      pluginVersion: '10.4.2',
+      targets: [
+        {
+          datasource: { type: 'loki', uid: 'loki' },
+          editorMode: 'code',
+          expr: '{compose_service=~"re-.*|scalar-re"} |= "Moved to DLQ"    ',
+          queryType: 'range',
+          refId: 'A',
+        },
+      ],
+      title: 'Moved to DLQ',
+      type: 'logs',
+    },
+    {
+      datasource: { type: 'loki', uid: 'loki' },
+      gridPos: { h: 8, w: 12, x: 12, y: 64 },
+      id: 17,
+      options: {
+        dedupStrategy: 'none',
+        enableLogDetails: true,
+        prettifyLogMessage: false,
+        showCommonLabels: false,
+        showLabels: false,
+        showTime: false,
+        sortOrder: 'Descending',
+        wrapLogMessage: false,
+      },
+      pluginVersion: '10.4.2',
+      targets: [
+        {
+          datasource: { type: 'loki', uid: 'loki' },
+          editorMode: 'code',
+          expr: '{compose_service=~"re-.*|scalar-re"} |= "Poison message"   ',
+          queryType: 'range',
+          refId: 'A',
+        },
+      ],
+      title: 'Poison message',
+      type: 'logs',
+    },
+  ],
+  refresh: '10s',
+  schemaVersion: 39,
+  tags: ['scalar-re'],
+  templating: { list: [] },
+  time: { from: 'now-1h', to: 'now' },
+  timepicker: {},
+  timezone: 'browser',
+  title: 'RE',
+  uid: 'scalar-re-dashboard',
+  version: 2,
+  weekStart: '',
+};

@@ -1,0 +1,17 @@
+# Headless Service for direct Pod access (verification, debugging).
+apiVersion: v1
+kind: Service
+metadata:
+  name: scalar-re-headless
+  namespace: scalar-re
+  labels:
+    app: scalar-re
+spec:
+  clusterIP: None
+  selector:
+    app: scalar-re
+  ports:
+  - name: http
+    port: 8080
+    targetPort: http
+    protocol: TCP

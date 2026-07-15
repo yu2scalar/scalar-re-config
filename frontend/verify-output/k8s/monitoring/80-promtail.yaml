@@ -1,0 +1,139 @@
+# Promtail DaemonSet — tails /var/log/pods on every node and pushes
+# to Loki. compose_service label is derived from the pod "app" label so
+# the shared dashboard LogQL works across Compose and K8s environments.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: promtail-config
+  namespace: scalar-re
+  labels:
+    app: promtail
+data:
+  config.yml: |
+    # Static glob + filename-regex approach: kubernetes_sd_configs gave
+    # zero targets on minikube (Promtail 2.9.x bug / quirk), but globbing
+    # /var/log/pods and parsing the path for namespace/pod/container
+    # labels works reliably. Docker driver puts actual logs under
+    # /var/lib/docker/containers and exposes them via symlink, so we mount
+    # both paths.
+    server:
+      http_listen_port: 9080
+      grpc_listen_port: 0
+    positions:
+      filename: /tmp/positions.yaml
+    clients:
+      - url: http://loki:3100/loki/api/v1/push
+    scrape_configs:
+      - job_name: pod-logs
+        pipeline_stages:
+          - docker: {}
+          - regex:
+              source: filename
+              expression: "/var/log/pods/(?P<namespace>[^_]+)_(?P<pod>[^_]+)_(?P<uid>[^/]+)/(?P<container>[^/]+)/.*\\.log"
+          - labels:
+              namespace:
+              pod:
+              container:
+          - template:
+              source: compose_service
+              template: "{{ .container }}"
+          - labels:
+              compose_service:
+        static_configs:
+          - targets: [localhost]
+            labels:
+              job: pod-logs
+              __path__: /var/log/pods/*/*/*.log
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: promtail
+  namespace: scalar-re
+  labels:
+    app: promtail
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: promtail-scalar-re
+  labels:
+    app: promtail
+rules:
+  - apiGroups: [""]
+    resources: ["pods", "nodes", "nodes/proxy"]
+    verbs: ["get", "list", "watch"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: promtail-scalar-re
+  labels:
+    app: promtail
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: promtail-scalar-re
+subjects:
+  - kind: ServiceAccount
+    name: promtail
+    namespace: scalar-re
+---
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: promtail
+  namespace: scalar-re
+  labels:
+    app: promtail
+spec:
+  selector:
+    matchLabels:
+      app: promtail
+  template:
+    metadata:
+      labels:
+        app: promtail
+    spec:
+      serviceAccountName: promtail
+      containers:
+        - name: promtail
+          image: grafana/promtail:2.9.0
+          args: ["-config.file=/etc/promtail/config.yml"]
+          volumeMounts:
+            - name: config
+              mountPath: /etc/promtail
+            - name: varlog-pods
+              mountPath: /var/log/pods
+              readOnly: true
+            - name: varlog-containers
+              mountPath: /var/log/containers
+              readOnly: true
+            # minikube's docker runtime writes actual container logs to
+            # /var/lib/docker/containers/<id>/<id>-json.log and exposes them
+            # under /var/log/pods via symlink. Promtail needs the real file
+            # reachable to follow those symlinks.
+            - name: docker-containers
+              mountPath: /var/lib/docker/containers
+              readOnly: true
+          resources:
+            requests:
+              cpu: 50m
+              memory: 128Mi
+            limits:
+              cpu: 500m
+              memory: 512Mi
+      volumes:
+        - name: config
+          configMap:
+            name: promtail-config
+        - name: varlog-pods
+          hostPath:
+            path: /var/log/pods
+        - name: varlog-containers
+          hostPath:
+            path: /var/log/containers
+        - name: docker-containers
+          hostPath:
+            path: /var/lib/docker/containers
+            type: DirectoryOrCreate

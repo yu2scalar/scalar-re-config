@@ -1,0 +1,227 @@
+services:
+  # --- Load Balancer ---
+  nginx:
+    image: nginx:alpine
+    profiles: ["app"]
+    ports:
+      - "${SCALAR_RE_LB_HOST_PORT:-8080}:80"
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf:ro
+    depends_on:
+      re-1:
+        condition: service_healthy
+      re-2:
+        condition: service_healthy
+      re-3:
+        condition: service_healthy
+    restart: on-failure
+
+  # --- Schema initialization (one-shot) ---
+  scalar-re-init:
+    image: scalar-re-init:latest
+    profiles: ["app"]
+    volumes:
+      - ./scalar-re-config.yml:/app/scalar-re-config.yml:ro
+    env_file: .env
+    depends_on:
+      mysql:
+        condition: service_healthy
+        required: false
+      postgres:
+        condition: service_healthy
+        required: false
+      dynamodb:
+        condition: service_started
+        required: false
+    restart: on-failure
+
+  # --- ScalarRE Node 1 ---
+  re-1:
+    image: scalar-re:latest
+    profiles: ["app"]
+    ports:
+      - "8181:8080"
+    volumes:
+      - ./scalar-re-config.yml:/app/scalar-re-config.yml:ro
+    env_file: .env
+    depends_on:
+      scalar-re-init:
+        condition: service_completed_successfully
+      mysql:
+        condition: service_healthy
+        required: false
+      postgres:
+        condition: service_healthy
+        required: false
+      dynamodb:
+        condition: service_started
+        required: false
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://localhost:8080/actuator/health || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+      start_period: 60s
+    restart: on-failure
+
+  # --- ScalarRE Node 2 ---
+  re-2:
+    image: scalar-re:latest
+    profiles: ["app"]
+    ports:
+      - "8182:8080"
+    volumes:
+      - ./scalar-re-config.yml:/app/scalar-re-config.yml:ro
+    env_file: .env
+    depends_on:
+      scalar-re-init:
+        condition: service_completed_successfully
+      mysql:
+        condition: service_healthy
+        required: false
+      postgres:
+        condition: service_healthy
+        required: false
+      dynamodb:
+        condition: service_started
+        required: false
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://localhost:8080/actuator/health || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+      start_period: 60s
+    restart: on-failure
+
+  # --- ScalarRE Node 3 ---
+  re-3:
+    image: scalar-re:latest
+    profiles: ["app"]
+    ports:
+      - "8183:8080"
+    volumes:
+      - ./scalar-re-config.yml:/app/scalar-re-config.yml:ro
+    env_file: .env
+    depends_on:
+      scalar-re-init:
+        condition: service_completed_successfully
+      mysql:
+        condition: service_healthy
+        required: false
+      postgres:
+        condition: service_healthy
+        required: false
+      dynamodb:
+        condition: service_started
+        required: false
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://localhost:8080/actuator/health || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+      start_period: 60s
+    restart: on-failure
+
+  # --- MySQL ---
+  mysql:
+    image: mysql:8.0
+    command: ["--max-connections=1000", "--max-connect-errors=100000"]
+    profiles: ["db"]
+    ports:
+      - "3306:3306"
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-rootpassword}
+    volumes:
+      - ./init-data/mysql-init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+      - mysql-data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+    restart: on-failure
+
+  # --- PostgreSQL ---
+  postgres:
+    image: postgres:15
+    command: ["postgres", "-c", "max_connections=1000"]
+    profiles: ["db"]
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_PASSWORD: ${POSTGRES_ROOT_PASSWORD:-rootpassword}
+    volumes:
+      - ./init-data/postgres-init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 15s
+    restart: on-failure
+
+  # --- DynamoDB Local ---
+  dynamodb:
+    image: amazon/dynamodb-local:latest
+    profiles: ["db"]
+    ports:
+      - "8000:8000"
+    user: root
+    command: ["-jar", "DynamoDBLocal.jar", "-sharedDb", "-dbPath", "/data"]
+    volumes:
+      - dynamodb-data:/data
+    restart: on-failure
+
+  # --- Monitoring ---
+  prometheus:
+    image: prom/prometheus:latest
+    profiles: ["monitoring"]
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus-data:/prometheus
+    restart: on-failure
+
+  grafana:
+    image: grafana/grafana:10.4.2
+    profiles: ["monitoring"]
+    ports:
+      - "3000:3000"
+    environment:
+      GF_AUTH_ANONYMOUS_ENABLED: "true"
+      GF_AUTH_ANONYMOUS_ORG_ROLE: "Viewer"
+    volumes:
+      - grafana-data:/var/lib/grafana
+      - ./grafana-provisioning:/etc/grafana/provisioning:ro
+    restart: on-failure
+
+  loki:
+    image: grafana/loki:2.9.0
+    profiles: ["monitoring"]
+    ports:
+      - "3100:3100"
+    command: ["-config.file=/etc/loki/local-config.yaml"]
+    volumes:
+      - ./loki-config.yml:/etc/loki/local-config.yaml:ro
+      - loki-data:/loki
+    restart: on-failure
+
+  promtail:
+    image: grafana/promtail:2.9.0
+    profiles: ["monitoring"]
+    command: ["-config.file=/etc/promtail/config.yml"]
+    volumes:
+      - ./promtail-config.yml:/etc/promtail/config.yml:ro
+      - /var/run/docker.sock:/var/run/docker.sock
+    restart: on-failure
+
+volumes:
+  grafana-data:
+  prometheus-data:
+  loki-data:
+  mysql-data:
+  postgres-data:
+  dynamodb-data:
