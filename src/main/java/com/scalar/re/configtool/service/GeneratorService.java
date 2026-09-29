@@ -38,8 +38,9 @@ import org.yaml.snakeyaml.Yaml;
  * Go prototype's {@code internal/generator/generator.go}.
  *
  * <ul>
- *   <li>{@link #toScalarDbProperties} — preview. Must match the Go output <b>exactly at the
- *       string level</b> (deterministic line assembly).</li>
+ *   <li>{@link #toScalarDbProperties} — preview. Matches the Go output at the string level
+ *       (deterministic line assembly) for configs with two or more storages; with a single
+ *       storage it deliberately differs — always multi-storage, like ScalarRE.</li>
  *   <li>{@link #saveYaml} — save. YAML output follows a <b>clean normalization policy</b>:
  *       large integers stay as plain integers (the scientific notation {@code 8.64e+07}
  *       of Go yaml.v3 is not adopted). Top-level keys use a fixed order, nested keys are
@@ -67,12 +68,14 @@ public class GeneratorService {
 
         List<String> storageNames = sortedKeys(storages);
 
-        // Core settings
-        if (storageNames.size() > 1) {
+        // Core settings. Always multi-storage, even with a single storage — same as ScalarRE
+        // (scalar-re backlog §2.49): the per-storage settings below are written under
+        // scalar.db.multi_storage.storages.<name>.*, which the single-storage mode never reads
+        // (it wants scalar.db.contact_points), so a one-storage config failed the DB verify /
+        // schema init with an empty contact_points.
+        boolean hasStorages = !storageNames.isEmpty();
+        if (hasStorages) {
             lines.add("scalar.db.storage=multi-storage");
-        } else if (storageNames.size() == 1) {
-            Map<String, Object> st = getMap(storages, storageNames.get(0));
-            lines.add("scalar.db.storage=" + getString(st, "type"));
         }
 
         String txManager = "consensus-commit";
@@ -93,7 +96,7 @@ public class GeneratorService {
         lines.add("scalar.db.consensus_commit.isolation_level=" + isolationLevel);
 
         // Multi-storage storages list
-        if (storageNames.size() > 1) {
+        if (hasStorages) {
             lines.add("scalar.db.multi_storage.storages=" + String.join(",", storageNames));
             lines.add("");
         }
@@ -145,7 +148,7 @@ public class GeneratorService {
         }
 
         // Namespace mapping
-        if (storageNames.size() > 1) {
+        if (hasStorages) {
             List<String> mappings = new ArrayList<>();
 
             String coordStorage = defaultStorage;

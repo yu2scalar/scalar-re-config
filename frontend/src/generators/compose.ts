@@ -132,6 +132,9 @@ function generateDockerCompose(config: UnifiedConfig, options: ComposeOptions): 
     lines.push('      timeout: 5s');
     lines.push('      retries: 10');
     lines.push('      start_period: 60s');
+    // Graceful shutdown (scalar-re backlog §2.51): drain delay + in-flight wait + web shutdown
+    // need more than Compose's default 10 s before SIGKILL
+    lines.push('    stop_grace_period: 60s');
     lines.push('    restart: on-failure');
   }
 

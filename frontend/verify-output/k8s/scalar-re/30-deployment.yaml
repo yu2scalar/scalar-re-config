@@ -24,6 +24,10 @@ spec:
         prometheus.io/port: "8080"
         prometheus.io/path: "/actuator/prometheus"
     spec:
+      # Graceful shutdown (scalar-re backlog §2.51): preStop sleep (10 s) + RE's drain delay
+      # (scalar-re.shutdown.drain-delay-ms, 5 s) + in-flight wait (inflight-timeout-ms, 20 s) +
+      # the web server's graceful shutdown (up to 30 s) + margin
+      terminationGracePeriodSeconds: 75
       imagePullSecrets:
       - name: ghcr-pull
       containers:
@@ -41,6 +45,13 @@ spec:
           mountPath: /app/scalar-re-config.yml
           subPath: scalar-re-config.yml
           readOnly: true
+        lifecycle:
+          preStop:
+            # Keep serving while the endpoints removal reaches kube-proxy / the load balancer;
+            # SIGTERM (and RE's graceful shutdown) follows. exec + sleep works on any Kubernetes
+            # version (the image is alpine); on 1.30+ `sleep: {seconds: 10}` is equivalent.
+            exec:
+              command: ["sleep", "10"]
         livenessProbe:
           httpGet:
             path: /actuator/health
@@ -51,7 +62,8 @@ spec:
           failureThreshold: 4
         readinessProbe:
           httpGet:
-            path: /actuator/health
+            # goes DOWN as soon as a graceful shutdown starts (scalar-re backlog §2.51)
+            path: /actuator/health/readiness
             port: http
           initialDelaySeconds: 15
           periodSeconds: 5
