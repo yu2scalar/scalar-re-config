@@ -65,6 +65,7 @@ public class ValidatorService {
         errors.addAll(validateScalarDbSyntax(scalardb, storages));
         // Level 2: Consistency validation
         errors.addAll(validateConsistency(storages, namespaces, global));
+        errors.addAll(validateApiKey(global));
 
         // Level 3: Deprecation warnings
         List<ValidationError> warnings = new ArrayList<>(validateDeprecations(global));
@@ -344,6 +345,21 @@ public class ValidatorService {
             }
         }
         return k;
+    }
+
+    /**
+     * {@code global.auth.api-key} is required: RE refuses to start without it (it authenticates the
+     * management API and the node-to-node calls). A {@code ${ENV:default}} placeholder is accepted —
+     * it is resolved where RE runs, and RE checks the resolved value at startup.
+     */
+    static List<ValidationError> validateApiKey(Map<String, Object> global) {
+        Map<String, Object> auth = global == null ? null : getMap(global, "auth");
+        String apiKey = auth == null ? "" : getString(auth, "api-key");
+        if (apiKey.isBlank()) {
+            return List.of(new ValidationError("error", "global.auth.api-key",
+                    "API key is required (RE does not start without it)"));
+        }
+        return List.of();
     }
 
     private List<ValidationError> validateDeprecations(Map<String, Object> global) {
