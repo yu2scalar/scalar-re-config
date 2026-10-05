@@ -23,6 +23,8 @@ import { extractEnvVars, hasMysql, hasPostgres, hasDynamo } from '../generators/
 
 interface Props {
   config: UnifiedConfig;
+  /** Validation errors of the config; any error disables saving (the output would not start RE). */
+  errorCount: number;
 }
 
 function generateCommands(config: UnifiedConfig, options: K8sOptions): { label: string; cmd: string }[] {
@@ -170,7 +172,7 @@ function generateCommands(config: UnifiedConfig, options: K8sOptions): { label: 
   return cmds;
 }
 
-export default function OutputK8s({ config }: Props) {
+export default function OutputK8s({ config, errorCount }: Props) {
   const [options, setOptions] = useState<K8sOptions>(defaultK8sOptions);
   const [activeTab, setActiveTab] = useState(0);
   const [saveStatus, setSaveStatus] = useState('');
@@ -181,6 +183,7 @@ export default function OutputK8s({ config }: Props) {
   const tabs = files.map((f) => f.path);
 
   async function handleSave() {
+    if (errorCount > 0) return;
     try {
       await downloadZip(files, 'scalar-re-k8s.zip');
       setSaveStatus('Downloaded scalar-re-k8s.zip');
@@ -193,8 +196,14 @@ export default function OutputK8s({ config }: Props) {
     <div>
       <div className="page-header">
         <div className="page-title">Kubernetes Output</div>
-        <button className="btn btn-primary" onClick={handleSave}>Save ZIP</button>
+        <button className="btn btn-primary" onClick={handleSave} disabled={errorCount > 0}>Save ZIP</button>
       </div>
+
+      {errorCount > 0 && (
+        <div className="preview-note" style={{ marginBottom: 12, color: 'var(--danger)' }}>
+          Saving is disabled: fix the {errorCount} validation error(s) first (see the footer).
+        </div>
+      )}
 
       {saveStatus && (
         <div style={{ marginBottom: 12, color: 'var(--text-secondary)', fontSize: 13 }}>

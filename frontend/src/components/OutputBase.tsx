@@ -21,6 +21,8 @@ import * as yaml from 'yaml';
 
 interface Props {
   config: UnifiedConfig;
+  /** Validation errors of the config; any error disables saving (the output would not start RE). */
+  errorCount: number;
 }
 
 type Tab = 'unified' | 'scalardb';
@@ -46,7 +48,7 @@ export function buildOrderedYaml(config: UnifiedConfig): string {
   return doc.toString({ indent: 2 });
 }
 
-export default function OutputBase({ config }: Props) {
+export default function OutputBase({ config, errorCount }: Props) {
   const [tab, setTab] = useState<Tab>('unified');
   const [scalardbProps, setScalardbProps] = useState('');
 
@@ -63,6 +65,7 @@ export default function OutputBase({ config }: Props) {
   const unifiedYaml = buildOrderedYaml(config);
 
   function handleSave() {
+    if (errorCount > 0) return;
     const blob = new Blob([unifiedYaml], { type: 'application/x-yaml' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
@@ -76,8 +79,14 @@ export default function OutputBase({ config }: Props) {
     <div>
       <div className="page-header">
         <div className="page-title">Base Output</div>
-        <button className="btn btn-primary" onClick={handleSave}>Save YAML</button>
+        <button className="btn btn-primary" onClick={handleSave} disabled={errorCount > 0}>Save YAML</button>
       </div>
+
+      {errorCount > 0 && (
+        <div className="preview-note" style={{ marginBottom: 12, color: 'var(--danger)' }}>
+          Saving is disabled: fix the {errorCount} validation error(s) first (see the footer).
+        </div>
+      )}
 
       <div className="preview-tabs">
         <div

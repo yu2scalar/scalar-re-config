@@ -66,6 +66,14 @@ public class ConfigController {
 
     @PostMapping("/save")
     public ResponseEntity<?> save(@RequestBody SaveRequest req) {
+        // a config with validation errors is not written (it would not start RE)
+        ValidatorService.Result result = validator.validate(req.config());
+        if (!result.errors().isEmpty()) {
+            Map<String, Object> resp = new LinkedHashMap<>();
+            resp.put("status", "invalid");
+            resp.put("errors", result.errors());
+            return ResponseEntity.badRequest().body(resp);
+        }
         try {
             generator.saveYaml(req.path(), req.config());
             Map<String, String> resp = new LinkedHashMap<>();
