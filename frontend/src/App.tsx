@@ -273,11 +273,11 @@ function App() {
           />
         );
       case 'output-base':
-        return <OutputBase config={config} />;
+        return <OutputBase config={config} errorCount={errors.length} />;
       case 'output-compose':
-        return <OutputCompose config={config} />;
+        return <OutputCompose config={config} errorCount={errors.length} />;
       case 'output-k8s':
-        return <OutputK8s config={config} />;
+        return <OutputK8s config={config} errorCount={errors.length} />;
       default:
         return null;
     }
