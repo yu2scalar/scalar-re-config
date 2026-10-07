@@ -11,9 +11,6 @@ global:
     internal-queue:
         queue-capacity: 10000
         worker-threads: 10
-    license:
-        expires-at: '2027-12-31T00:00:00Z'
-        max-nodes: 3
     polling:
         dedup-enabled: true
         dedup-peer-timeout-ms: 3000

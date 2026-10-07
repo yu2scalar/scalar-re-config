@@ -28,6 +28,13 @@ export function orderedConfig(config: UnifiedConfig): Record<string, unknown> {
       ordered[key] = config[key as keyof UnifiedConfig];
     }
   }
+  // A license is not required (RE uses max-nodes = 9999 when absent), so it is never emitted.
+  // Copy global so the loaded config itself is left untouched.
+  if (config.global && 'license' in config.global) {
+    const global: Record<string, unknown> = { ...config.global };
+    delete global['license'];
+    ordered['global'] = global;
+  }
   for (const key of Object.keys(config)) {
     if (!keyOrder.includes(key)) {
       ordered[key] = config[key as keyof UnifiedConfig];

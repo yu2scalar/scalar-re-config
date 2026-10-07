@@ -57,30 +57,6 @@ export default function GlobalSettings({ config, onChange }: Props) {
       </div>
 
       <div className="form-section">
-        <div className="form-section-title">License</div>
-        <div className="form-grid">
-          <div className="form-group">
-            <PropLabel label="Max Nodes" prop="scalar-re.license.max-nodes" />
-            <input
-              type="number"
-              className="form-input"
-              value={g.license?.['max-nodes'] ?? ''}
-              onChange={(e) => updateNested('license', { 'max-nodes': e.target.value ? Number(e.target.value) : undefined })}
-            />
-          </div>
-          <div className="form-group">
-            <PropLabel label="Expires At" prop="scalar-re.license.expires-at" />
-            <input
-              type="date"
-              className="form-input"
-              value={g.license?.['expires-at'] || ''}
-              onChange={(e) => updateNested('license', { 'expires-at': e.target.value })}
-            />
-          </div>
-        </div>
-      </div>
-
-      <div className="form-section">
         <div className="form-section-title">ScalarDB</div>
         <div className="form-grid">
           <div className="form-group">

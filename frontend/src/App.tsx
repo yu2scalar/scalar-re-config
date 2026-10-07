@@ -200,6 +200,8 @@ function App() {
           delete g['management-namespace'];
           delete g['management-storage'];
           delete g['offload-completed-table'];
+          // license is no longer required or emitted (RE defaults max-nodes to 9999)
+          delete g['license'];
           // re-tables inner keys are physical table names = snake_case. Normalize
           // any legacy kebab key (re-node-heartbeat → re_node_heartbeat) so a
           // loaded config does not retain kebab (or duplicate kebab + snake).
