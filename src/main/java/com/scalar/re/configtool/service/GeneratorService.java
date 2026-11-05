@@ -323,8 +323,21 @@ public class GeneratorService {
 
     public void saveYaml(String path, Map<String, Object> config) throws IOException {
         Map<String, Object> ordered = orderTopLevel(config);
+        dropLicense(ordered);
         String out = new Yaml(dumperOptions()).dump(ordered);
         Files.writeString(Path.of(path), out, StandardCharsets.UTF_8);
+    }
+
+    /**
+     * Drops {@code global.license} from the output. A license is not required (RE runs with
+     * max-nodes = 9999 when it is absent), so the tool never emits it; an old config that still
+     * has it is loaded without error and loses it on save. Works on the ordered copy only.
+     */
+    @SuppressWarnings("unchecked")
+    static void dropLicense(Map<String, Object> ordered) {
+        if (ordered.get("global") instanceof Map) {
+            ((Map<String, Object>) ordered.get("global")).remove("license");
+        }
     }
 
     private static DumperOptions dumperOptions() {

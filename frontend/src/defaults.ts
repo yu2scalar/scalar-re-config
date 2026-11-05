@@ -76,10 +76,6 @@ export const defaultConfig: UnifiedConfig = {
       'heartbeat-expiry-ms': 60000,
       'cleanup-retention-ms': 86400000,
     },
-    license: {
-      'max-nodes': 3,
-      'expires-at': '2027-12-31',
-    },
     server: {
       'tomcat-max-threads': 200,
     },
